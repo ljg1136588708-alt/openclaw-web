@@ -79,17 +79,14 @@ RUN install -d -m 0755 "$COREPACK_HOME" && \
 
 RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw && chmod 755 /app/openclaw.mjs
 
-RUN install -d -m 0755 -o node -g node /home/node/.config && \
-    install -d -m 0700 -o node -g node \
-      /home/node/.openclaw \
-      /home/node/.openclaw/workspace \
-      /home/node/.config/openclaw
-
 ENV NODE_ENV=production
-USER node
+
+# 启动脚本：运行时创建 /data 目录并动态绑定 Railway $PORT
+RUN printf '#!/bin/sh\nset -e\nmkdir -p "${OPENCLAW_STATE_DIR:-/data/.openclaw}"\nmkdir -p "${OPENCLAW_STATE_DIR:-/data/.openclaw}/npm/projects"\nmkdir -p "${OPENCLAW_WORKSPACE_DIR:-/data/workspace}"\nexport OPENCLAW_GATEWAY_PORT="${PORT:-18789}"\nif [ -n "${DEEPSEEK_API_KEY}" ]; then\n  node /app/openclaw.mjs config set agents.defaults.models '"'"'{"deepseek/deepseek-v4-flash":{"alias":"DeepSeek V4 Flash"},"deepseek/deepseek-v4-pro":{"alias":"DeepSeek V4 Pro"},"deepseek/deepseek-reasoner":{"alias":"DeepSeek Reasoner (R1)"}}'"'"' --strict-json --merge 2>/dev/null || true\nfi\nif [ -n "${OPENAI_API_KEY}" ]; then\n  node /app/openclaw.mjs config set models.providers.openai '"'"'{"baseUrl":"https://api.apiyi.com/v1"}'"'"' --strict-json --merge 2>/dev/null || true\n  node /app/openclaw.mjs config set agents.defaults.imageGenerationModel '"'"'{"primary":"openai/gemini-3.1-flash-image-preview","fallbacks":["openai/gpt-image-1"],"timeoutMs":300000}'"'"' --strict-json --merge 2>/dev/null || true\n  node /app/openclaw.mjs config set agents.defaults.mediaGenerationAutoProviderFallback false --strict-json --merge 2>/dev/null || true\nfi\nexec "$@"\n' > /usr/local/bin/docker-entrypoint.sh && \
+    chmod 755 /usr/local/bin/docker-entrypoint.sh
 
 HEALTHCHECK --interval=3m --timeout=10s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||18789)+'/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-ENTRYPOINT ["tini", "-s", "--"]
-CMD ["node", "openclaw.mjs", "gateway"]
+ENTRYPOINT ["tini", "-s", "--", "/usr/local/bin/docker-entrypoint.sh"]
+CMD ["node", "openclaw.mjs", "gateway", "--bind", "lan", "--auth", "password"]
