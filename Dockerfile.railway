@@ -3,7 +3,7 @@ ARG OPENCLAW_BUNDLED_PLUGIN_DIR=extensions
 ARG OPENCLAW_EXTENSIONS=""
 
 # ── 构建阶段 ──────────────────────────────────────────────
-FROM node:24-bookworm AS build
+FROM node:26-bookworm AS build
 ARG OPENCLAW_BUNDLED_PLUGIN_DIR
 ARG OPENCLAW_EXTENSIONS
 
@@ -45,7 +45,7 @@ RUN pnpm prune --prod \
     --config.supportedArchitectures.libc=glibc || true
 
 # ── 运行时阶段 ──────────────────────────────────────────────
-FROM node:24-bookworm-slim AS runtime
+FROM node:26-bookworm-slim AS runtime
 ARG OPENCLAW_BUNDLED_PLUGIN_DIR
 
 RUN apt-get update && \
